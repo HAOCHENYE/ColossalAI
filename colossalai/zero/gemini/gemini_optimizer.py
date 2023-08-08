@@ -1,6 +1,5 @@
 # this code is inspired by the DeepSpeed library and implemented with our own design from scratch
 import copy
-import gc
 import math
 import warnings
 from typing import Any, Dict, Iterator, OrderedDict, Set, Tuple
@@ -18,6 +17,7 @@ from colossalai.tensor.d_tensor import is_distributed_tensor
 from colossalai.utils import disposable, get_current_device, is_ddp_ignored
 
 from .chunk import Chunk, ChunkManager
+from .chunk.chunk import free_storage
 from .gemini_ddp import ZeroDDP
 
 __all__ = ['ZeroOptimizer', 'GeminiAdamOptimizer']
@@ -470,8 +470,8 @@ class ZeroOptimizer(ColossalaiOptimizer):
 
         # Clean gathered states
         for state_shard in gathered_state_shards:
-            del state_shard[0]
-            gc.collect()
+            if isinstance(state_shard, torch.Tensor):
+                free_storage(state_shard)
 
         # Reshape tensors
         if is_collector:
